@@ -20,12 +20,10 @@ workflows:
 
       - name: Build Debug APK
         script: |
-          cd ad-skipper-android-1.2.0
           ./gradlew assembleDebug
 
       - name: Add signing config
         script: |
-          cd ad-skipper-android-1.2.0
           if [ -n "$CM_KEYSTORE" ]; then
             echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/keystore.jks
             cat >> app/build.gradle.kts <<EOF
@@ -50,7 +48,6 @@ workflows:
 
       - name: Build Release APK
         script: |
-          cd ad-skipper-android-1.2.0
           if [ -n "$CM_KEYSTORE" ]; then
             ./gradlew assembleRelease
           else
@@ -58,8 +55,8 @@ workflows:
           fi
 
     artifacts:
-      - ad-skipper-android-1.2.0/app/build/outputs/apk/**/*.apk
-      - ad-skipper-android-1.2.0/app/build/outputs/**/mapping.txt
+      - app/build/outputs/apk/**/*.apk
+      - app/build/outputs/**/mapping.txt
 
     publishing:
       email:
