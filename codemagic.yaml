@@ -1,14 +1,65 @@
 workflows:
   android-workflow:
-    name: Android Build
-    instance_type: mac_mini_m1
+    name: Ad Skipper Android Build
     max_build_duration: 60
+    instance_type: mac_mini_m2
     environment:
+      java: 17
+      groups:
+        - keystore_credentials   # Codemagic UI me is naam se env group banao (release build ke liye)
       vars:
-        - ANDROID_SDK_ROOT: /usr/local/share/android-sdk
+        PACKAGE_NAME: "com.anarbastanov.adskipper"
+    cache:
+      cache_paths:
+        - ~/.gradle/caches
+
     scripts:
-      - name: Build Android APK
+      - name: Set Android SDK licenses
+        script: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Build Debug APK
         script: |
+          cd ad-skipper-android-1.2.0
           ./gradlew assembleDebug
+
+      # Release build ke liye keystore chahiye. Agar signing setup nahi kiya
+      # to ye step comment kar do ya sirf assembleRelease (unsigned) chalao.
+      - name: Build Release APK (signed)
+        script: |
+          cd ad-skipper-android-1.2.0
+          if [ -n "$CM_KEYSTORE" ]; then
+            echo $CM_KEYSTORE | base64 --decode > $CM_BUILD_DIR/keystore.jks
+            cat >> app/build.gradle.kts <<EOF
+
+android {
+    signingConfigs {
+        create("release") {
+            storeFile = file("${CM_BUILD_DIR}/keystore.jks")
+            storePassword = System.getenv("CM_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("CM_KEY_ALIAS")
+            keyPassword = System.getenv("CM_KEY_PASSWORD")
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+}
+EOF
+            ./gradlew assembleRelease
+          else
+            echo "Keystore env vars set nahi hain, release build skip kiya. Sirf debug APK milega."
+          fi
+
     artifacts:
-      - app/build/outputs/apk/**/*.apk
+      - ad-skipper-android-1.2.0/app/build/outputs/apk/**/*.apk
+      - ad-skipper-android-1.2.0/app/build/outputs/**/mapping.txt
+
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com   # apna email daalo
+        notify:
+          success: true
+          failure: true
