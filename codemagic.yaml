@@ -14,10 +14,6 @@ workflows:
         - ~/.gradle/caches
 
     scripts:
-      - name: Set Android SDK licenses
-        script: |
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
-
       - name: Debug - show repo structure
         script: |
           echo "Working directory:"
@@ -27,14 +23,24 @@ workflows:
           echo "Looking for gradlew anywhere in repo:"
           find . -iname "gradlew*" -not -path "*/node_modules/*"
 
-      - name: Build Debug APK
+      - name: Locate project and build Debug APK
         script: |
+          GRADLEW_PATH=$(find . -maxdepth 4 -iname "gradlew" -not -path "*/node_modules/*" | head -1)
+          if [ -z "$GRADLEW_PATH" ]; then
+            echo "ERROR: gradlew kahin bhi nahi mila is repo me. Check karo ki gradlew file git me commit hui hai ya nahi (git add -f gradlew)."
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$GRADLEW_PATH")
+          echo "Project mila yahan: $PROJECT_DIR"
+          echo "export PROJECT_DIR=$PROJECT_DIR" >> $CM_ENV
+          cd "$PROJECT_DIR"
           chmod +x ./gradlew
           ./gradlew assembleDebug
 
       - name: Add signing config
         script: |
           if [ -n "$CM_KEYSTORE" ]; then
+            cd "$PROJECT_DIR"
             echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/keystore.jks
             cat >> app/build.gradle.kts <<EOF
 
@@ -59,6 +65,7 @@ workflows:
       - name: Build Release APK
         script: |
           if [ -n "$CM_KEYSTORE" ]; then
+            cd "$PROJECT_DIR"
             chmod +x ./gradlew
             ./gradlew assembleRelease
           else
@@ -66,8 +73,8 @@ workflows:
           fi
 
     artifacts:
-      - app/build/outputs/apk/**/*.apk
-      - app/build/outputs/**/mapping.txt
+      - "**/app/build/outputs/apk/**/*.apk"
+      - "**/app/build/outputs/**/mapping.txt"
 
     publishing:
       email:
