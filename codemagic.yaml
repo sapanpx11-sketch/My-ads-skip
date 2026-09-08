@@ -18,8 +18,18 @@ workflows:
         script: |
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
+      - name: Debug - show repo structure
+        script: |
+          echo "Working directory:"
+          pwd
+          echo "Top-level files:"
+          ls -la
+          echo "Looking for gradlew anywhere in repo:"
+          find . -iname "gradlew*" -not -path "*/node_modules/*"
+
       - name: Build Debug APK
         script: |
+          chmod +x ./gradlew
           ./gradlew assembleDebug
 
       - name: Add signing config
@@ -49,6 +59,7 @@ workflows:
       - name: Build Release APK
         script: |
           if [ -n "$CM_KEYSTORE" ]; then
+            chmod +x ./gradlew
             ./gradlew assembleRelease
           else
             echo "Keystore env vars set nahi hain, release build skip kiya. Sirf debug APK milega."
