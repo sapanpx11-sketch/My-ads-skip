@@ -15,38 +15,43 @@ workflows:
 
     scripts:
       - name: Set Android SDK licenses
-        script: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        script: |
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Build Debug APK
         script: |
           cd ad-skipper-android-1.2.0
           ./gradlew assembleDebug
 
-      # Release build ke liye keystore chahiye. Agar signing setup nahi kiya
-      # to ye step comment kar do ya sirf assembleRelease (unsigned) chalao.
-      - name: Build Release APK (signed)
+      - name: Add signing config
         script: |
           cd ad-skipper-android-1.2.0
           if [ -n "$CM_KEYSTORE" ]; then
-            echo $CM_KEYSTORE | base64 --decode > $CM_BUILD_DIR/keystore.jks
+            echo "$CM_KEYSTORE" | base64 --decode > $CM_BUILD_DIR/keystore.jks
             cat >> app/build.gradle.kts <<EOF
 
-android {
-    signingConfigs {
-        create("release") {
-            storeFile = file("${CM_BUILD_DIR}/keystore.jks")
-            storePassword = System.getenv("CM_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("CM_KEY_ALIAS")
-            keyPassword = System.getenv("CM_KEY_PASSWORD")
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            signingConfig = signingConfigs.getByName("release")
-        }
-    }
-}
-EOF
+          android {
+              signingConfigs {
+                  create("release") {
+                      storeFile = file("$CM_BUILD_DIR/keystore.jks")
+                      storePassword = System.getenv("CM_KEYSTORE_PASSWORD")
+                      keyAlias = System.getenv("CM_KEY_ALIAS")
+                      keyPassword = System.getenv("CM_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  getByName("release") {
+                      signingConfig = signingConfigs.getByName("release")
+                  }
+              }
+          }
+          EOF
+          fi
+
+      - name: Build Release APK
+        script: |
+          cd ad-skipper-android-1.2.0
+          if [ -n "$CM_KEYSTORE" ]; then
             ./gradlew assembleRelease
           else
             echo "Keystore env vars set nahi hain, release build skip kiya. Sirf debug APK milega."
